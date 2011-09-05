@@ -1,3 +1,5 @@
+package com.github.siasia
+
 import sbt._
 
 import java.lang.reflect.{Method, Modifier}

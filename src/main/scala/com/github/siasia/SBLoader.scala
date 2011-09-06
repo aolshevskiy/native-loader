@@ -11,11 +11,12 @@ import Keys._
 object SBLoader extends Plugin {
 	val sbLibs = SettingKey[Seq[File]]("sb-libs")
 
-	class SBRun(instance: ScalaInstance, trapExit: Boolean, sbLibs: Seq[File]) extends ScalaRun
+	class SBRun(instance: ScalaInstance, trapExit: Boolean, nativeTmp: File, sbLibs: Seq[File]) extends ScalaRun
 	{
-		val singletonLoader = ClasspathUtilities.makeLoader(sbLibs, instance)
+		val singletonLoader = ClasspathUtilities.makeLoader(sbLibs, instance.loader, instance, nativeTmp)
 		/** Runs the class 'mainClass' using the given classpath and options using the scala runner.*/
-		def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger) =	{
+		def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger) =
+		{
 			log.info("Running " + mainClass + " " + options.mkString(" "))
 
 			def execute = 
@@ -40,7 +41,8 @@ object SBLoader extends Plugin {
 			try { main.invoke(null, options.toArray[String].asInstanceOf[Array[String]] ) }
 			finally { currentThread.setContextClassLoader(oldLoader) }
 		}
-		def getMainMethod(mainClassName: String, loader: ClassLoader) =	{
+		def getMainMethod(mainClassName: String, loader: ClassLoader) =
+		{
 			val mainClass = Class.forName(mainClassName, true, loader)
 			val method = mainClass.getMethod("main", classOf[Array[String]])
 			val modifiers = method.getModifiers
@@ -49,7 +51,9 @@ object SBLoader extends Plugin {
 			method
 		}
 	}
-	def runInit: Project.Initialize[ScalaRun] = (scalaInstance, trapExit, sbLibs) { (si, trap, sbLibs) => new SBRun(si, trap, sbLibs) }
+	def runInit: Project.Initialize[Task[ScalaRun]] =
+		(taskTemporaryDirectory, scalaInstance, trapExit, sbLibs) map {
+			(tmp, si, trap, sbLibs) => new SBRun(si, trap, tmp, sbLibs) }
 	def sbLoaderSettings = Seq(
 		sbLibs := Seq(),
 		runner in run <<= runInit,

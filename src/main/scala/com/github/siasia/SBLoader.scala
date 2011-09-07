@@ -11,9 +11,12 @@ import Keys._
 object SBLoader extends Plugin {
 	val sbLibs = SettingKey[Seq[File]]("sb-libs")
 
+	var singletonLoader: java.lang.ClassLoader = null
+
 	class SBRun(instance: ScalaInstance, trapExit: Boolean, nativeTmp: File, sbLibs: Seq[File]) extends ScalaRun
 	{
-		val singletonLoader = ClasspathUtilities.makeLoader(sbLibs, instance.loader, instance, nativeTmp)
+		if(singletonLoader == null)
+			singletonLoader = ClasspathUtilities.makeLoader(sbLibs, instance.loader, instance, nativeTmp)
 		/** Runs the class 'mainClass' using the given classpath and options using the scala runner.*/
 		def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger) =
 		{

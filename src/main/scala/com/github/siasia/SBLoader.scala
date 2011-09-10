@@ -11,55 +11,21 @@ import Keys._
 object SBLoader extends Plugin {
 	val sbLibs = SettingKey[Seq[File]]("sb-libs")
 
-	var singletonLoader: java.lang.ClassLoader = null
+	private var singletonLoader: ClassLoader = null
 
-	class SBRun(instance: ScalaInstance, trapExit: Boolean, nativeTmp: File, sbLibs: Seq[File]) extends ScalaRun
-	{
+	def scalaInstanceSetting(version: String, launcher: xsbti.Launcher, sbLibs: Seq[File]) = {
+		val provider = launcher.getScala(version)		
 		if(singletonLoader == null)
-			singletonLoader = ClasspathUtilities.makeLoader(sbLibs, instance.loader, instance, nativeTmp)
-		/** Runs the class 'mainClass' using the given classpath and options using the scala runner.*/
-		def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger) =
-		{
-			log.info("Running " + mainClass + " " + options.mkString(" "))
-
-			def execute = 
-				try { run0(mainClass, classpath, options, log) }
-				catch { case e: java.lang.reflect.InvocationTargetException => throw e.getCause }
-			def directExecute = try { execute; None } catch { case e: Exception => log.trace(e); Some(e.toString) }
-
-			if(trapExit) Run.executeTrapExit( execute, log ) else directExecute
-		}
-		private def run0(mainClassName: String, classpath: Seq[File], options: Seq[String], log: Logger)
-		{
-			log.debug("  Classpath:\n\t" + classpath.mkString("\n\t"))
-			val loader = ClasspathUtilities.toLoader(classpath, singletonLoader)
-			val main = getMainMethod(mainClassName, loader)
-			invokeMain(loader, main, options)
-		}
-		private def invokeMain(loader: ClassLoader, main: Method, options: Seq[String])
-		{
-			val currentThread = Thread.currentThread
-			val oldLoader = Thread.currentThread.getContextClassLoader()
-			currentThread.setContextClassLoader(loader)
-			try { main.invoke(null, options.toArray[String].asInstanceOf[Array[String]] ) }
-			finally { currentThread.setContextClassLoader(oldLoader) }
-		}
-		def getMainMethod(mainClassName: String, loader: ClassLoader) =
-		{
-			val mainClass = Class.forName(mainClassName, true, loader)
-			val method = mainClass.getMethod("main", classOf[Array[String]])
-			val modifiers = method.getModifiers
-			if(!isPublic(modifiers)) throw new NoSuchMethodException(mainClassName + ".main is not public")
-			if(!isStatic(modifiers)) throw new NoSuchMethodException(mainClassName + ".main is not static")
-			method
-		}
+			singletonLoader = ClasspathUtilities.toLoader(sbLibs ,provider.loader)
+		new ScalaInstance(version, singletonLoader, provider.libraryJar, provider.compilerJar, (provider.jars.toSet - provider.libraryJar - provider.compilerJar).toSeq, None)
 	}
-	def runInit: Project.Initialize[Task[ScalaRun]] =
-		(taskTemporaryDirectory, scalaInstance, trapExit, sbLibs) map {
-			(tmp, si, trap, sbLibs) => new SBRun(si, trap, tmp, sbLibs) }
+		
+
 	def sbLoaderSettings = Seq(
 		sbLibs := Seq(),
-		runner in run <<= runInit,
-		runner in (Test, run) <<= runInit
+		scalaInstance <<= (appConfiguration, scalaVersion, sbLibs) map { (app, version, sbLibs) =>
+			val launcher = app.provider.scalaProvider.launcher
+			scalaInstanceSetting(version, launcher, sbLibs)
+		}
 	)
 }

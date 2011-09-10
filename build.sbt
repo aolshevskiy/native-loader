@@ -1,3 +1,7 @@
+seq(scriptedSettings :_*)
+
+scriptedBufferLog := false
+
 sbtPlugin := true
 
 organization := "com.github.siasia"

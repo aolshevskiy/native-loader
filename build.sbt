@@ -1,14 +1,10 @@
-seq(scriptedSettings :_*)
-
-scriptedBufferLog := false
-
 sbtPlugin := true
 
 organization := "com.github.siasia"
 
-name := "sbloader"
+name := "native-loader"
 
-version := "0.1-SNAPSHOT"
+version := "0.1"
 
 publishMavenStyle := true
 
